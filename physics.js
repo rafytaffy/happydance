@@ -61,9 +61,9 @@ const PALETTES = {
 // 1. Pebble Grid Particle
 class Pebble {
   constructor(x, y, colWidth, rowHeight) {
-    // Organic river stones shapes - aspect ratios capped to prevent extreme overlaps
-    this.aspectRatio = Math.random() * 0.35 + 0.95; // aspect ratio: 0.95 to 1.30 (very round, matching the photo)
-    this.sizeMultiplier = Math.random() * 0.10 + 0.95; // size multiplier: 0.95 to 1.05 (uniform clean layout)
+    // Aspect ratio from 1:1 to 1:5, skewed for organic look (fewer extremely long 5:1 ones, more ~1.5:1 - 3:1)
+    const ratio = 1.0 + Math.pow(Math.random(), 1.6) * 4.0;
+    this.aspectRatio = ratio;
     
     // NO position jitter to keep grid spacing perfectly uniform and prevent clumping overlaps
     this.jitterX = 0;
@@ -72,8 +72,12 @@ class Pebble {
     this.x = x;
     this.y = y;
     
-    // Slightly smaller than cell width to ensure they touch tightly with a clean black gap but NO overlaps
-    this.baseW = colWidth * 0.94; 
+    // Scale max dimension dynamically with ratio to prevent excessive shrinking of area
+    // To make gaps hairline-thin, we make the max dimension exceed the cell width
+    const maxDim = colWidth * (1.18 + (ratio - 1.0) * 0.12);
+    const minDim = maxDim / ratio;
+    
+    this.baseW = minDim; // For highlight reflection glow scaling
     this.w = 0;
     this.h = 0;
     
@@ -92,20 +96,28 @@ class Pebble {
     this.floatSeed = Math.random() * 100;
     this.shake = 0;
 
+    // Random stretch axis angle for organic variation (tilted elongated pebbles at any angle)
+    const stretchAngle = Math.random() * Math.PI * 2;
+    const semiAxisX = maxDim / 2;
+    const semiAxisY = minDim / 2;
+
     // Precalculate organic asymmetric stone vertices (5 to 7 points) with smooth curved edges
     const numPoints = Math.floor(Math.random() * 3) + 5; // 5 to 7 vertices
     this.points = [];
-    const baseR = this.baseW * this.sizeMultiplier / 2;
-    const aspectY = this.aspectRatio;
     
     for (let i = 0; i < numPoints; i++) {
       const angle = (i / numPoints) * Math.PI * 2 + (Math.random() - 0.5) * 0.08;
       
       // Radius variance (0.90 to 1.05) creates soft, organic, wavy borders, not straight lines
       const r = (Math.random() * 0.15 + 0.90);
-      const px = Math.cos(angle) * baseR * r;
-      const py = Math.sin(angle) * baseR * aspectY * r;
-      this.points.push({ x: px, y: py });
+      const px = Math.cos(angle) * semiAxisX * r;
+      const py = Math.sin(angle) * semiAxisY * r;
+      
+      // Rotate by stretchAngle to align along a random orientation
+      const rx = px * Math.cos(stretchAngle) - py * Math.sin(stretchAngle);
+      const ry = px * Math.sin(stretchAngle) + py * Math.cos(stretchAngle);
+      
+      this.points.push({ x: rx, y: ry });
     }
 
     // Build cached Path2D for premium performance
@@ -140,7 +152,7 @@ class Pebble {
         depth = 0.7 - (normY - 0.82) * 2;
       }
 
-      this.targetScale = 0.98; // Keeps a tiny separation gap and prevents any overlaps
+      this.targetScale = 1.01; // Scale up slightly to overlap cell edges, making gaps hairline-thin
       this.color = PALETTES[currentPalette](depth, normY);
       
       // Floating/organic wave animation
@@ -165,8 +177,8 @@ class Pebble {
     this.rotation += (this.targetRotation - this.rotation) * 0.08;
     
     // Scale widths and heights according to physical constants
-    this.w = this.baseW * this.sizeMultiplier * this.scale;
-    this.h = this.baseW * this.sizeMultiplier * this.aspectRatio * this.scale;
+    this.w = this.baseW * this.scale;
+    this.h = this.baseW * this.aspectRatio * this.scale;
 
     // Handle sound shake
     this.shake = globalShake * (Math.random() - 0.5) * 8;
