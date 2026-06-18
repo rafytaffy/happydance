@@ -107,6 +107,21 @@ class Pebble {
       const py = Math.sin(angle) * baseR * aspectY * r;
       this.points.push({ x: px, y: py });
     }
+
+    // Build cached Path2D for premium performance
+    this.path = new Path2D();
+    const len = this.points.length;
+    let xc = (this.points[0].x + this.points[len - 1].x) / 2;
+    let yc = (this.points[0].y + this.points[len - 1].y) / 2;
+    this.path.moveTo(xc, yc);
+    
+    for (let i = 0; i < len; i++) {
+      const p1 = this.points[i];
+      const p2 = this.points[(i + 1) % len];
+      xc = (p1.x + p2.x) / 2;
+      yc = (p1.y + p2.y) / 2;
+      this.path.quadraticCurveTo(p1.x, p1.y, xc, yc);
+    }
   }
 
   update(normX, normY, segEngine, currentPalette, time, globalShake) {
@@ -157,6 +172,51 @@ class Pebble {
     this.shake = globalShake * (Math.random() - 0.5) * 8;
   }
 
+  drawBack(ctx) {
+    if (this.scale < 0.01) return;
+
+    ctx.save();
+    ctx.translate(this.x + this.offsetX + this.shake, this.y + this.offsetY + this.shake);
+    ctx.rotate(this.rotation);
+    ctx.scale(this.scale * 0.95, this.scale * 0.95);
+
+    // Parse HSL from color string to make it darker for the background layer
+    const colorMatch = this.color.match(/hsla\(([^,]+),\s*([^%]+)%\s*,\s*([^%]+)%\s*,\s*([^)]+)\)/);
+    let darkColor = this.color;
+    if (colorMatch) {
+      const h = colorMatch[1];
+      const s = colorMatch[2];
+      const l = Math.max(30, Number(colorMatch[3]) - 16); // Make 16% darker
+      const a = colorMatch[4];
+      darkColor = `hsla(${h}, ${s}%, ${l}%, ${a})`;
+    }
+
+    ctx.fillStyle = darkColor;
+    ctx.fill(this.path);
+
+    // Draw physical thin dark border to separate geometries
+    ctx.strokeStyle = 'rgba(5, 5, 8, 0.65)';
+    ctx.lineWidth = 1.6 / Math.max(0.1, this.scale);
+    ctx.stroke(this.path);
+
+    ctx.restore();
+  }
+
+  drawShadow(ctx) {
+    if (this.scale < 0.01) return;
+
+    ctx.save();
+    // Translate slightly to the bottom-right for the shadow casting offset
+    ctx.translate(this.x + this.offsetX + this.shake + 2.5, this.y + this.offsetY + this.shake + 3.5);
+    ctx.rotate(this.rotation);
+    ctx.scale(this.scale, this.scale);
+
+    ctx.fillStyle = 'rgba(5, 5, 8, 0.48)'; // Shadow color
+    ctx.fill(this.path);
+
+    ctx.restore();
+  }
+
   draw(ctx) {
     if (this.scale < 0.01) return;
 
@@ -167,25 +227,12 @@ class Pebble {
 
     // Draw solid organic pebble using precalculated irregular path
     ctx.fillStyle = this.color;
-    ctx.beginPath();
-    const len = this.points.length;
-    let xc = (this.points[0].x + this.points[len - 1].x) / 2;
-    let yc = (this.points[0].y + this.points[len - 1].y) / 2;
-    ctx.moveTo(xc, yc);
-    
-    for (let i = 0; i < len; i++) {
-      const p1 = this.points[i];
-      const p2 = this.points[(i + 1) % len];
-      xc = (p1.x + p2.x) / 2;
-      yc = (p1.y + p2.y) / 2;
-      ctx.quadraticCurveTo(p1.x, p1.y, xc, yc);
-    }
-    ctx.fill();
+    ctx.fill(this.path);
 
     // Draw physical thin dark border to separate geometries
     ctx.strokeStyle = 'rgba(5, 5, 8, 0.52)';
     ctx.lineWidth = 1.8 / Math.max(0.1, this.scale);
-    ctx.stroke();
+    ctx.stroke(this.path);
 
     // High premium styling: soft organic reflection glow inside
     ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
@@ -547,10 +594,11 @@ class PhysicsEngine {
     this.currentMode = 'pebbles'; // 'pebbles', 'bubbles', 'sand'
     this.palette = 'rainbow'; // 'rainbow', 'neon', 'sunset', 'ocean'
 
-    // Grid details for Pebble Mode - adjusted for 2x larger organic pebbles
-    this.cols = 25;
-    this.rows = 16;
+    // Grid details for Pebble Mode - adjusted for 4x more pebbles
+    this.cols = 50;
+    this.rows = 31;
     this.pebbles = [];
+    this.backPebbles = [];
 
     // Bubble Pool
     this.maxBubbles = 400;
@@ -577,6 +625,7 @@ class PhysicsEngine {
     
     // 1. Setup Pebble Grid
     this.pebbles = [];
+    this.backPebbles = [];
     const colWidth = this.width / this.cols;
     const rowHeight = colWidth * 0.866; // Perfect hexagonal vertical step to eliminate rows/stripes
     this.rows = Math.ceil(this.height / rowHeight) + 1;
@@ -588,6 +637,11 @@ class PhysicsEngine {
         const px = c * colWidth + colWidth * 0.5 + staggerX;
         const py = r * rowHeight + rowHeight * 0.5;
         this.pebbles.push(new Pebble(px, py, colWidth, rowHeight));
+        
+        // Secondary layer pebble: offset horizontally and vertically to fill gaps
+        const bx = px + colWidth * 0.5;
+        const by = py + rowHeight * 0.5;
+        this.backPebbles.push(new Pebble(bx, by, colWidth, rowHeight));
       }
     }
 
@@ -659,9 +713,15 @@ class PhysicsEngine {
       const len = this.pebbles.length;
       for (let i = 0; i < len; i++) {
         const p = this.pebbles[i];
+        const bp = this.backPebbles[i];
+        
         const normX = p.x / this.width;
         const normY = p.y / this.height;
         p.update(normX, normY, segEngine, this.palette, time, this.globalShake);
+        
+        const bNormX = bp.x / this.width;
+        const bNormY = bp.y / this.height;
+        bp.update(bNormX, bNormY, segEngine, this.palette, time, this.globalShake);
       }
     } 
     else if (this.currentMode === 'bubbles') {
@@ -747,6 +807,18 @@ class PhysicsEngine {
     // 1. Draw mode-specific elements
     if (this.currentMode === 'pebbles') {
       const len = this.pebbles.length;
+      
+      // Draw back layer pebbles first
+      for (let i = 0; i < len; i++) {
+        this.backPebbles[i].drawBack(ctx);
+      }
+      
+      // Draw shadow overlays from top layer
+      for (let i = 0; i < len; i++) {
+        this.pebbles[i].drawShadow(ctx);
+      }
+      
+      // Draw front layer pebbles on top
       for (let i = 0; i < len; i++) {
         this.pebbles[i].draw(ctx);
       }
