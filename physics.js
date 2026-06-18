@@ -155,9 +155,9 @@ class Pebble {
       this.targetScale = 1.01; // Scale up slightly to overlap cell edges, making gaps hairline-thin
       this.color = PALETTES[currentPalette](depth, normY);
       
-      // Floating/organic wave animation
-      this.offsetX = Math.sin(time * 0.0022 + this.floatSeed) * 2.2;
-      this.offsetY = Math.cos(time * 0.0016 + this.floatSeed) * 2.2;
+      // Floating/organic wave animation removed to keep pebbles perfectly static
+      this.offsetX = 0;
+      this.offsetY = 0;
       
       if (isGround) {
         // Flat/horizontal alignment for floor pebbles
