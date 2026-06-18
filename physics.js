@@ -56,22 +56,22 @@ const PALETTES = {
 class Pebble {
   constructor(x, y, colWidth, rowHeight) {
     // Unique shape geometry for organic physical stone look - rounder river stones
-    this.aspectRatio = Math.random() * 0.35 + 1.05; // height / width ratio: 1.05 to 1.4 (much rounder)
-    this.sizeMultiplier = Math.random() * 0.25 + 0.95; // size multiplier: 0.95 to 1.2
+    this.aspectRatio = Math.random() * 0.15 + 0.98; // height / width ratio: 0.98 to 1.13 (very round river stones)
+    this.sizeMultiplier = Math.random() * 0.12 + 0.92; // size multiplier: 0.92 to 1.04
     
-    // Position jitter to break artificial grids
-    this.jitterX = (Math.random() - 0.5) * colWidth * 0.42;
-    this.jitterY = (Math.random() - 0.5) * rowHeight * 0.42;
+    // Position jitter: small enough to prevent overlapping, but large enough to look organic
+    this.jitterX = (Math.random() - 0.5) * colWidth * 0.16;
+    this.jitterY = (Math.random() - 0.5) * rowHeight * 0.16;
     
     this.x = x + this.jitterX;
     this.y = y + this.jitterY;
     
-    this.baseW = colWidth * 1.34; // Wider base to eliminate gaps
+    this.baseW = colWidth * 0.92; // Slightly smaller than cell width to leave a gap
     this.w = 0;
     this.h = 0;
     
     // Initial random angle tilts for natural stone packing
-    this.rotationJitter = (Math.random() - 0.5) * 0.95; // random tilt offset
+    this.rotationJitter = (Math.random() - 0.5) * 0.25; // small tilt offset since they are already hex-aligned
     this.rotation = this.rotationJitter;
     this.targetRotation = this.rotation;
     
@@ -83,22 +83,21 @@ class Pebble {
     this.offsetX = 0;
     this.offsetY = 0;
     this.floatSeed = Math.random() * 100;
-
-    // Vibration/shake factor for sound reactivity
     this.shake = 0;
 
-    // Precalculate organic asymmetric blob shape vertices
+    // Precalculate organic asymmetric hex-blob shape vertices (points towards neighbor cells)
     const numPoints = 6;
     this.points = [];
     const baseR = this.baseW * this.sizeMultiplier / 2;
     
     for (let i = 0; i < numPoints; i++) {
-      const angle = (i / numPoints) * Math.PI * 2 + (Math.random() - 0.5) * 0.12;
+      // Hexagonal directions: 0, 60, 120, 180, 240, 300 degrees
+      const angle = (i / numPoints) * Math.PI * 2 + (Math.random() - 0.5) * 0.08;
       const radiusX = baseR;
       const radiusY = baseR * this.aspectRatio;
       
-      // Radius variance (0.84 to 1.16) generates organic bumps and flat edges
-      const r = (Math.random() * 0.32 + 0.84);
+      // Radius variance (0.92 to 1.06) generates subtle organic facets
+      const r = (Math.random() * 0.14 + 0.92);
       const px = Math.cos(angle) * radiusX * r;
       const py = Math.sin(angle) * radiusY * r;
       this.points.push({ x: px, y: py });
@@ -121,7 +120,7 @@ class Pebble {
         depth = 0.7 - (normY - 0.82) * 2;
       }
 
-      this.targetScale = 1.25; // Overlap significantly to form continuous shapes without gaps
+      this.targetScale = 0.96; // Do not overlap neighbors to leave a small gap
       this.color = PALETTES[currentPalette](depth, normY);
       
       // Floating/organic wave animation
@@ -550,8 +549,8 @@ class PhysicsEngine {
     this.palette = 'rainbow'; // 'rainbow', 'neon', 'sunset', 'ocean'
 
     // Grid details for Pebble Mode - adjusted for larger, rounder pebbles
-    this.cols = 58;
-    this.rows = 35;
+    this.cols = 50;
+    this.rows = 31;
     this.pebbles = [];
 
     // Bubble Pool
