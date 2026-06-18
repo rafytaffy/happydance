@@ -1,0 +1,10 @@
+{
+  "name": "happy-dance",
+  "version": "1.0.0",
+  "description": "Interactive Silhouette Depth Visualizer for Kids",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx -y http-server -p 3000"
+  },
+  "dependencies": {}
+}

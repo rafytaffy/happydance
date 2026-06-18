@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Happy Dance! Interactive Silhouette Visualizer</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="A gorgeous, interactive silhouette camera visualizer for kids. Dance, move, make sounds, and watch colorful shapes pack and explode!">
+  
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- FontAwesome Icons for Beautiful Controls -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+  
+  <!-- MediaPipe Selfie Segmentation CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <!-- Hidden camera video buffer -->
+  <video id="webcam" autoplay playsinline muted></video>
+
+  <!-- Core Render Canvas -->
+  <canvas id="renderCanvas"></canvas>
+
+  <!-- Sound Alert Overlay for screams & claps -->
+  <div class="sound-alert" id="soundAlert">
+    <i class="fa-solid fa-wand-magic-sparkles"></i>
+    <span id="alertText">SOUND DETECTED!</span>
+  </div>
+
+  <!-- Welcome / Access Screen (Important: user gesture starts AudioContext) -->
+  <div class="welcome-screen" id="welcomeScreen">
+    <div class="welcome-card">
+      <div class="welcome-logo">
+        <div class="welcome-logo-pulse"></div>
+        <div class="welcome-logo-icon">
+          <i class="fa-solid fa-gamepad"></i>
+        </div>
+      </div>
+      <h2>HAPPY DANCE!</h2>
+      <p>
+        Get ready to dance! This game will copy your movements with colorful shapes and make cool fireworks when you clap or shout!
+      </p>
+      <p style="font-size: 0.8rem; margin-top: -10px;">
+        <i class="fa-solid fa-circle-info"></i> Please allow camera and microphone permissions when prompted.
+      </p>
+      <button class="start-btn" id="startBtn">START DANCING!</button>
+    </div>
+  </div>
+
+  <!-- Interactive HUD & Controller Overlay -->
+  <div class="overlay-container">
+    
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="brand">
+        <div class="brand-dot"></div>
+        <h1>Happy Dance</h1>
+        <a href="https://github.com/rafytaffy" target="_blank" class="github-link" title="Visit rafytaffy on GitHub" style="color: var(--text-secondary); text-decoration: none; font-size: 0.85rem; margin-left: 8px; border-left: 1px solid rgba(255,255,255,0.15); padding-left: 8px; display: flex; align-items: center; gap: 5px;"><i class="fa-brands fa-github"></i>rafytaffy</a>
+      </div>
+      
+      <div class="top-actions">
+        <!-- Stats HUD -->
+        <div class="hud-stats">
+          <span id="fpsHud">FPS: 60</span>
+          <span id="latencyHud">Latency: 0ms</span>
+        </div>
+        
+        <!-- Toggle Settings Menu -->
+        <button class="btn-circle" id="settingsToggle" title="Settings">
+          <i class="fa-solid fa-sliders"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Sidebar Settings Panel (Fades in/out) -->
+    <div class="settings-panel hidden" id="settingsPanel">
+      
+      <!-- Camera Selection -->
+      <div class="settings-section">
+        <h3><i class="fa-solid fa-video"></i> Camera Select</h3>
+        <select id="cameraSelect">
+          <option>Loading cameras...</option>
+        </select>
+      </div>
+
+      <!-- Mode Selector -->
+      <div class="settings-section">
+        <h3><i class="fa-solid fa-cubes"></i> Play Mode</h3>
+        <div class="mode-grid">
+          <button class="mode-btn active" data-mode="pebbles">
+            <i class="fa-solid fa-egg"></i>
+            <span>Pebble</span>
+          </button>
+          <button class="mode-btn" data-mode="bubbles">
+            <i class="fa-solid fa-circle-nodes"></i>
+            <span>Bubble</span>
+          </button>
+          <button class="mode-btn" data-mode="sand">
+            <i class="fa-solid fa-water"></i>
+            <span>Sand</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Palette Selector -->
+      <div class="settings-section">
+        <h3><i class="fa-solid fa-palette"></i> Colors</h3>
+        <select id="paletteSelect">
+          <option value="rainbow">Rainbow Depth</option>
+          <option value="neon">Neon Lights</option>
+          <option value="sunset">Sunset Gold</option>
+          <option value="ocean">Deep Ocean</option>
+        </select>
+      </div>
+
+      <!-- Clap Sensitivity -->
+      <div class="settings-section">
+        <div class="slider-group">
+          <div class="slider-header">
+            <span><i class="fa-solid fa-hands-clapping"></i> Clap Detector</span>
+            <span>Sensitivity</span>
+          </div>
+          <input type="range" id="clapSensitivitySlider" min="1" max="10" value="6">
+        </div>
+      </div>
+
+      <!-- Scream Sensitivity -->
+      <div class="settings-section">
+        <div class="slider-group">
+          <div class="slider-header">
+            <span><i class="fa-solid fa-volume-high"></i> Scream Detector</span>
+            <span>Sensitivity</span>
+          </div>
+          <input type="range" id="screamSensitivitySlider" min="1" max="10" value="5">
+        </div>
+      </div>
+
+      <!-- Live Volume Monitor -->
+      <div class="settings-section">
+        <h3><i class="fa-solid fa-microphone-lines"></i> Mic Volume</h3>
+        <div class="audio-monitor">
+          <div class="mic-status-indicator" id="micStatus"></div>
+          <div class="audio-bar-bg">
+            <div class="audio-bar-fill" id="audioFill"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Debug Toggles -->
+      <div class="settings-section">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <h3 style="margin: 0;"><i class="fa-solid fa-bug"></i> Debug Mode</h3>
+          <input type="checkbox" id="debugToggle" style="width: 20px; height: 20px; cursor: pointer;">
+        </div>
+      </div>
+      
+    </div>
+
+    <!-- Debug Windows (Visible in debug mode) -->
+    <div class="debug-panel" id="debugPanel">
+      <div class="debug-canvas-wrapper active">
+        <span>Webcam</span>
+        <canvas id="videoDebugCanvas" width="160" height="120"></canvas>
+      </div>
+      <div class="debug-canvas-wrapper active">
+        <span>Silhouette Mask</span>
+        <canvas id="maskDebugCanvas" width="160" height="120"></canvas>
+      </div>
+    </div>
+    
+  </div>
+
+  <!-- Load JavaScript Modules -->
+  <script src="segmentation.js"></script>
+  <script src="physics.js"></script>
+  <script src="audio.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
