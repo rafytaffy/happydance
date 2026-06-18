@@ -55,18 +55,18 @@ const PALETTES = {
 // 1. Pebble Grid Particle
 class Pebble {
   constructor(x, y, colWidth, rowHeight) {
-    // Unique shape geometry for organic physical stone look
-    this.aspectRatio = Math.random() * 0.55 + 1.25; // height / width ratio: 1.25 to 1.8 (some long, some round)
-    this.sizeMultiplier = Math.random() * 0.35 + 0.85; // size multiplier: 0.85 to 1.2
+    // Unique shape geometry for organic physical stone look - rounder river stones
+    this.aspectRatio = Math.random() * 0.35 + 1.05; // height / width ratio: 1.05 to 1.4 (much rounder)
+    this.sizeMultiplier = Math.random() * 0.25 + 0.95; // size multiplier: 0.95 to 1.2
     
     // Position jitter to break artificial grids
-    this.jitterX = (Math.random() - 0.5) * colWidth * 0.35;
-    this.jitterY = (Math.random() - 0.5) * rowHeight * 0.35;
+    this.jitterX = (Math.random() - 0.5) * colWidth * 0.42;
+    this.jitterY = (Math.random() - 0.5) * rowHeight * 0.42;
     
     this.x = x + this.jitterX;
     this.y = y + this.jitterY;
     
-    this.baseW = colWidth * 0.95;
+    this.baseW = colWidth * 1.34; // Wider base to eliminate gaps
     this.w = 0;
     this.h = 0;
     
@@ -104,7 +104,7 @@ class Pebble {
         depth = 0.7 - (normY - 0.82) * 2;
       }
 
-      this.targetScale = 1.05; // Slightly overlap for tight packing
+      this.targetScale = 1.25; // Overlap significantly to form continuous shapes without gaps
       this.color = PALETTES[currentPalette](depth, normY);
       
       // Floating/organic wave animation
@@ -519,9 +519,9 @@ class PhysicsEngine {
     this.currentMode = 'pebbles'; // 'pebbles', 'bubbles', 'sand'
     this.palette = 'rainbow'; // 'rainbow', 'neon', 'sunset', 'ocean'
 
-    // Grid details for Pebble Mode
-    this.cols = 75;
-    this.rows = 45;
+    // Grid details for Pebble Mode - adjusted for larger, rounder pebbles
+    this.cols = 58;
+    this.rows = 35;
     this.pebbles = [];
 
     // Bubble Pool
