@@ -55,23 +55,28 @@ const PALETTES = {
 // 1. Pebble Grid Particle
 class Pebble {
   constructor(x, y, colWidth, rowHeight) {
-    // Unique shape geometry for organic physical stone look - rounder river stones
-    this.aspectRatio = Math.random() * 0.16 + 0.94; // height / width ratio: 0.94 to 1.10 (very round river stones)
-    this.sizeMultiplier = Math.random() * 0.08 + 0.96; // size multiplier: 0.96 to 1.04 (highly uniform size for clean fit)
+    // 1:1 up to 4:1 aspect ratio. Let's make some long/oblong and some round.
+    // 35% are elongated (1.5 to 3.8 aspect ratio), 65% are rounder (0.9 to 1.4)
+    this.aspectRatio = Math.random() < 0.35 ? (Math.random() * 2.3 + 1.5) : (Math.random() * 0.5 + 0.9);
     
-    // Position jitter: tiny to keep gaps uniform and prevent massive gaps / clumping
-    this.jitterX = (Math.random() - 0.5) * colWidth * 0.07;
-    this.jitterY = (Math.random() - 0.5) * rowHeight * 0.07;
+    // Sizing factor
+    this.sizeMultiplier = Math.random() * 0.16 + 0.94; // 0.94 to 1.10
     
-    this.x = x + this.jitterX;
-    this.y = y + this.jitterY;
+    // NO position jitter to keep grid spacing perfectly uniform and minimize gaps
+    this.jitterX = 0;
+    this.jitterY = 0;
     
-    this.baseW = colWidth * 1.12; // Slightly larger than grid spacing so they nest tightly in all directions
+    this.x = x;
+    this.y = y;
+    
+    // 2x larger grid cell means colWidth is 2x larger.
+    // Make baseW slightly larger than cell width to ensure they touch tightly
+    this.baseW = colWidth * 1.14; 
     this.w = 0;
     this.h = 0;
     
-    // Initial random angle tilts for natural stone packing
-    this.rotationJitter = (Math.random() - 0.5) * 0.22; // small tilt offset since they are already hex-aligned
+    // Full 360-degree rotation jitter so elongated stones lie in all organic directions (horizontal, vertical, diagonal)
+    this.rotationJitter = Math.random() * Math.PI * 2;
     this.rotation = this.rotationJitter;
     this.targetRotation = this.rotation;
     
@@ -85,68 +90,21 @@ class Pebble {
     this.floatSeed = Math.random() * 100;
     this.shake = 0;
 
-    // Precalculate organic asymmetric shape based on a random type:
-    // 0 = Oval/Egg, 1 = Rounded Rect/Boxy, 2 = Rounded Triangle, 3 = Diamond/Pentagon
-    const shapeType = Math.floor(Math.random() * 4); 
+    // Precalculate organic asymmetric stone vertices (5 to 7 points)
+    // Irregular control points create wavy, natural, non-straight edges
+    const numPoints = Math.floor(Math.random() * 3) + 5; // 5 to 7 vertices
     this.points = [];
     const baseR = this.baseW * this.sizeMultiplier / 2;
     const aspectY = this.aspectRatio;
-
-    if (shapeType === 0) {
-      // Oval/Egg shape: 6 points with smooth transition
-      const numPoints = 6;
-      for (let i = 0; i < numPoints; i++) {
-        const angle = (i / numPoints) * Math.PI * 2 + (Math.random() - 0.5) * 0.08;
-        // Egg shape: wider at bottom (py > 0) than top (py < 0)
-        const eggFactor = Math.sin(angle) > 0 ? 1.04 : 0.88;
-        const r = (Math.random() * 0.08 + 0.94) * eggFactor;
-        const px = Math.cos(angle) * baseR * r;
-        const py = Math.sin(angle) * baseR * aspectY * r;
-        this.points.push({ x: px, py: py });
-      }
-    } 
-    else if (shapeType === 1) {
-      // Rounded Rectangle / Boxy: 8 points grouped near corners
-      const cornerAngles = [
-        35, 55,    // Top Right
-        125, 145,  // Top Left
-        215, 235,  // Bottom Left
-        305, 325   // Bottom Right
-      ];
-      for (const baseAngle of cornerAngles) {
-        const angle = (baseAngle / 180) * Math.PI;
-        // Pull corners out slightly to make it boxy
-        const r = (Math.random() * 0.06 + 0.98) * 1.05;
-        const px = Math.cos(angle) * baseR * r;
-        const py = Math.sin(angle) * baseR * aspectY * r;
-        this.points.push({ x: px, y: py });
-      }
-    } 
-    else if (shapeType === 2) {
-      // Rounded Triangle: 6 points grouped near 3 corners (90, 210, 330 degrees)
-      const triAngles = [
-        80, 100,   // Top
-        200, 220,  // Bottom Left
-        320, 340   // Bottom Right
-      ];
-      for (const baseAngle of triAngles) {
-        const angle = (baseAngle / 180) * Math.PI;
-        const r = (Math.random() * 0.06 + 0.96) * 1.06;
-        const px = Math.cos(angle) * baseR * r;
-        const py = Math.sin(angle) * baseR * aspectY * r;
-        this.points.push({ x: px, y: py });
-      }
-    } 
-    else {
-      // Rounded Diamond / Pentagon: 5 points
-      const pentAngles = [0, 72, 144, 216, 288];
-      for (const baseAngle of pentAngles) {
-        const angle = (baseAngle / 180) * Math.PI + (Math.random() - 0.5) * 0.08;
-        const r = (Math.random() * 0.12 + 0.92);
-        const px = Math.cos(angle) * baseR * r;
-        const py = Math.sin(angle) * baseR * aspectY * r;
-        this.points.push({ x: px, y: py });
-      }
+    
+    for (let i = 0; i < numPoints; i++) {
+      const angle = (i / numPoints) * Math.PI * 2 + (Math.random() - 0.5) * 0.18;
+      
+      // Radius variance (0.80 to 1.20) creates natural indentations, bumps, and asymmetrical facets
+      const r = (Math.random() * 0.40 + 0.80);
+      const px = Math.cos(angle) * baseR * r;
+      const py = Math.sin(angle) * baseR * aspectY * r;
+      this.points.push({ x: px, y: py });
     }
   }
 
@@ -166,7 +124,7 @@ class Pebble {
         depth = 0.7 - (normY - 0.82) * 2;
       }
 
-      this.targetScale = 1.02; // Tight puzzle packing scale
+      this.targetScale = 1.03; // Nest tightly together
       this.color = PALETTES[currentPalette](depth, normY);
       
       // Floating/organic wave animation
@@ -175,16 +133,10 @@ class Pebble {
       
       if (isGround) {
         // Flat/horizontal alignment for floor pebbles
-        this.targetRotation = Math.PI / 2 + this.rotationJitter * 0.3;
+        this.targetRotation = Math.PI / 2 + (Math.random() - 0.5) * 0.15;
       } else if (isSilhouette) {
-        // Tilt dynamic along body contour
-        const blob = segEngine.getBlobAt(normX, normY);
-        if (blob) {
-          const normCenterX = blob.centerX / segEngine.maskWidth;
-          this.targetRotation = (normX - normCenterX) * 0.65 + this.rotationJitter * 0.45;
-        } else {
-          this.targetRotation = this.rotationJitter;
-        }
+        // Keeps their random rotated angles to look like a jumble of hand-packed stones
+        this.targetRotation = this.rotationJitter;
       }
     } else {
       this.targetScale = 0.0;
@@ -231,7 +183,7 @@ class Pebble {
 
     // Draw physical thin dark border to separate geometries
     ctx.strokeStyle = 'rgba(5, 5, 8, 0.52)';
-    ctx.lineWidth = 1.6 / Math.max(0.1, this.scale);
+    ctx.lineWidth = 1.8 / Math.max(0.1, this.scale);
     ctx.stroke();
 
     // High premium styling: soft organic reflection glow inside
@@ -594,9 +546,9 @@ class PhysicsEngine {
     this.currentMode = 'pebbles'; // 'pebbles', 'bubbles', 'sand'
     this.palette = 'rainbow'; // 'rainbow', 'neon', 'sunset', 'ocean'
 
-    // Grid details for Pebble Mode - adjusted for larger, rounder pebbles
-    this.cols = 50;
-    this.rows = 31;
+    // Grid details for Pebble Mode - adjusted for 2x larger organic pebbles
+    this.cols = 25;
+    this.rows = 16;
     this.pebbles = [];
 
     // Bubble Pool
