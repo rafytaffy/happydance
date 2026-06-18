@@ -86,6 +86,23 @@ class Pebble {
 
     // Vibration/shake factor for sound reactivity
     this.shake = 0;
+
+    // Precalculate organic asymmetric blob shape vertices
+    const numPoints = 6;
+    this.points = [];
+    const baseR = this.baseW * this.sizeMultiplier / 2;
+    
+    for (let i = 0; i < numPoints; i++) {
+      const angle = (i / numPoints) * Math.PI * 2 + (Math.random() - 0.5) * 0.12;
+      const radiusX = baseR;
+      const radiusY = baseR * this.aspectRatio;
+      
+      // Radius variance (0.84 to 1.16) generates organic bumps and flat edges
+      const r = (Math.random() * 0.32 + 0.84);
+      const px = Math.cos(angle) * radiusX * r;
+      const py = Math.sin(angle) * radiusY * r;
+      this.points.push({ x: px, y: py });
+    }
   }
 
   update(normX, normY, segEngine, currentPalette, time, globalShake) {
@@ -148,22 +165,35 @@ class Pebble {
     ctx.save();
     ctx.translate(this.x + this.offsetX + this.shake, this.y + this.offsetY + this.shake);
     ctx.rotate(this.rotation);
+    ctx.scale(this.scale, this.scale);
 
-    // Draw solid pebble base
+    // Draw solid organic pebble using precalculated irregular path
     ctx.fillStyle = this.color;
     ctx.beginPath();
-    ctx.ellipse(0, 0, this.w / 2, this.h / 2, 0, 0, Math.PI * 2);
+    const len = this.points.length;
+    let xc = (this.points[0].x + this.points[len - 1].x) / 2;
+    let yc = (this.points[0].y + this.points[len - 1].y) / 2;
+    ctx.moveTo(xc, yc);
+    
+    for (let i = 0; i < len; i++) {
+      const p1 = this.points[i];
+      const p2 = this.points[(i + 1) % len];
+      xc = (p1.x + p2.x) / 2;
+      yc = (p1.y + p2.y) / 2;
+      ctx.quadraticCurveTo(p1.x, p1.y, xc, yc);
+    }
     ctx.fill();
 
     // Draw physical thin dark border to separate geometries
-    ctx.strokeStyle = 'rgba(5, 5, 8, 0.48)';
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = 'rgba(5, 5, 8, 0.52)';
+    ctx.lineWidth = 1.6 / Math.max(0.1, this.scale);
     ctx.stroke();
 
     // High premium styling: soft organic reflection glow inside
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
     ctx.beginPath();
-    ctx.ellipse(-this.w/6, -this.h/6, this.w/4, this.h/6, Math.PI/4, 0, Math.PI * 2);
+    const glowR = this.baseW * 0.25;
+    ctx.ellipse(-this.baseW/6, -this.baseW/6, glowR, glowR/1.5, Math.PI/4, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
