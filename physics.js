@@ -12,29 +12,35 @@ const PALETTES = {
   rainbow: (depth, pctY = 0) => {
     // Shift the vertical color stops based on distance (depth)
     // 0 = close (warmer, shifts up), 1 = far (cooler, shifts down)
-    const shiftedY = Math.max(0, Math.min(1.0, pctY - (1.0 - depth) * 0.45));
+    const shiftedY = Math.max(0, Math.min(1.0, pctY - (1.0 - depth) * 0.35));
     
-    // Smooth interpolation between exact stops matching the physical art:
-    // shiftedY = 1.0 (bottom): Solid cyan/blue (hue 195)
-    // shiftedY = 0.75 (middle-bottom): Teal/cyan (hue 165)
-    // shiftedY = 0.55 (middle): Vibrant Green (hue 115)
-    // shiftedY = 0.40 (middle-top): Gold/Yellow (hue 55)
-    // shiftedY = 0.22 (top-middle): Orange (hue 28)
-    // shiftedY = 0.0 (top): Solid Red (hue 0)
+    // Muted, sophisticated pastel earth tones matching the reference image:
+    // shiftedY = 1.0 (bottom): Slate Blue/Teal (HSL 195, 24%, 74%)
+    // shiftedY = 0.70 (middle-bottom): Sage Green (HSL 130, 20%, 78%)
+    // shiftedY = 0.45 (middle-top): Mint/Olive (HSL 110, 18%, 80%)
+    // shiftedY = 0.20 (top-middle): Soft Sand/Gold (HSL 50, 22%, 82%)
+    // shiftedY = 0.0 (top): Cream/Alabaster (HSL 40, 18%, 84%)
     let hue = 0;
-    if (shiftedY < 0.22) {
-      hue = (shiftedY / 0.22) * 28;
-    } else if (shiftedY < 0.40) {
-      hue = 28 + ((shiftedY - 0.22) / 0.18) * 27;
-    } else if (shiftedY < 0.55) {
-      hue = 55 + ((shiftedY - 0.40) / 0.15) * 60;
-    } else if (shiftedY < 0.75) {
-      hue = 115 + ((shiftedY - 0.55) / 0.20) * 50;
+    let sat = 20;
+    let light = 80;
+    
+    if (shiftedY < 0.35) {
+      hue = 40 + (shiftedY / 0.35) * 10;
+      sat = 18 + (shiftedY / 0.35) * 4;
+      light = 84 - (shiftedY / 0.35) * 2;
+    } else if (shiftedY < 0.70) {
+      const t = (shiftedY - 0.35) / 0.35;
+      hue = 50 + t * 80;
+      sat = 22 - t * 2;
+      light = 82 - t * 4;
     } else {
-      hue = 165 + ((shiftedY - 0.75) / 0.25) * 30;
+      const t = (shiftedY - 0.70) / 0.30;
+      hue = 130 + t * 65;
+      sat = 20 + t * 4;
+      light = 78 - t * 4;
     }
     
-    return `hsla(${Math.floor(hue)}, 95%, 52%, 1)`;
+    return `hsla(${Math.floor(hue)}, ${Math.floor(sat)}%, ${Math.floor(light)}%, 1)`;
   },
   neon: (depth, pctY = 0) => {
     const hues = [330, 280, 190, 220]; 
@@ -55,28 +61,24 @@ const PALETTES = {
 // 1. Pebble Grid Particle
 class Pebble {
   constructor(x, y, colWidth, rowHeight) {
-    // 1:1 up to 4:1 aspect ratio. Let's make some long/oblong and some round.
-    // 35% are elongated (1.5 to 3.8 aspect ratio), 65% are rounder (0.9 to 1.4)
-    this.aspectRatio = Math.random() < 0.35 ? (Math.random() * 2.3 + 1.5) : (Math.random() * 0.5 + 0.9);
+    // Organic river stones shapes - aspect ratios capped to prevent extreme overlaps
+    this.aspectRatio = Math.random() * 0.35 + 0.95; // aspect ratio: 0.95 to 1.30 (very round, matching the photo)
+    this.sizeMultiplier = Math.random() * 0.10 + 0.95; // size multiplier: 0.95 to 1.05 (uniform clean layout)
     
-    // Sizing factor
-    this.sizeMultiplier = Math.random() * 0.16 + 0.94; // 0.94 to 1.10
-    
-    // NO position jitter to keep grid spacing perfectly uniform and minimize gaps
+    // NO position jitter to keep grid spacing perfectly uniform and prevent clumping overlaps
     this.jitterX = 0;
     this.jitterY = 0;
     
     this.x = x;
     this.y = y;
     
-    // 2x larger grid cell means colWidth is 2x larger.
-    // Make baseW slightly larger than cell width to ensure they touch tightly
-    this.baseW = colWidth * 1.14; 
+    // Slightly smaller than cell width to ensure they touch tightly with a clean black gap but NO overlaps
+    this.baseW = colWidth * 0.94; 
     this.w = 0;
     this.h = 0;
     
-    // Full 360-degree rotation jitter so elongated stones lie in all organic directions (horizontal, vertical, diagonal)
-    this.rotationJitter = Math.random() * Math.PI * 2;
+    // Subtle rotation tilt for natural stone alignment (no wild 360 spins, matching photo)
+    this.rotationJitter = (Math.random() - 0.5) * 0.5; // slight tilt of +-15 degrees
     this.rotation = this.rotationJitter;
     this.targetRotation = this.rotation;
     
@@ -90,18 +92,17 @@ class Pebble {
     this.floatSeed = Math.random() * 100;
     this.shake = 0;
 
-    // Precalculate organic asymmetric stone vertices (5 to 7 points)
-    // Irregular control points create wavy, natural, non-straight edges
+    // Precalculate organic asymmetric stone vertices (5 to 7 points) with smooth curved edges
     const numPoints = Math.floor(Math.random() * 3) + 5; // 5 to 7 vertices
     this.points = [];
     const baseR = this.baseW * this.sizeMultiplier / 2;
     const aspectY = this.aspectRatio;
     
     for (let i = 0; i < numPoints; i++) {
-      const angle = (i / numPoints) * Math.PI * 2 + (Math.random() - 0.5) * 0.18;
+      const angle = (i / numPoints) * Math.PI * 2 + (Math.random() - 0.5) * 0.08;
       
-      // Radius variance (0.80 to 1.20) creates natural indentations, bumps, and asymmetrical facets
-      const r = (Math.random() * 0.40 + 0.80);
+      // Radius variance (0.90 to 1.05) creates soft, organic, wavy borders, not straight lines
+      const r = (Math.random() * 0.15 + 0.90);
       const px = Math.cos(angle) * baseR * r;
       const py = Math.sin(angle) * baseR * aspectY * r;
       this.points.push({ x: px, y: py });
@@ -124,7 +125,7 @@ class Pebble {
         depth = 0.7 - (normY - 0.82) * 2;
       }
 
-      this.targetScale = 1.03; // Nest tightly together
+      this.targetScale = 0.98; // Keeps a tiny separation gap and prevents any overlaps
       this.color = PALETTES[currentPalette](depth, normY);
       
       // Floating/organic wave animation
@@ -133,9 +134,9 @@ class Pebble {
       
       if (isGround) {
         // Flat/horizontal alignment for floor pebbles
-        this.targetRotation = Math.PI / 2 + (Math.random() - 0.5) * 0.15;
+        this.targetRotation = Math.PI / 2 + (Math.random() - 0.5) * 0.1;
       } else if (isSilhouette) {
-        // Keeps their random rotated angles to look like a jumble of hand-packed stones
+        // Maintain neat aligned tilts
         this.targetRotation = this.rotationJitter;
       }
     } else {
