@@ -145,7 +145,7 @@ class Bubble {
     this.color = '';
     this.opacity = 0;
     this.targetOpacity = 0.8;
-    this.life = 1.0;
+    this.life = 0.0;
     this.decay = Math.random() * 0.005 + 0.002;
     
     // Wave drift
