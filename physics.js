@@ -56,17 +56,17 @@ const PALETTES = {
 class Pebble {
   constructor(x, y, colWidth, rowHeight) {
     // Unique shape geometry for organic physical stone look - rounder river stones
-    this.aspectRatio = Math.random() * 0.15 + 0.98; // height / width ratio: 0.98 to 1.13 (very round river stones)
-    this.sizeMultiplier = Math.random() * 0.12 + 0.92; // size multiplier: 0.92 to 1.04
+    this.aspectRatio = Math.random() * 0.16 + 0.98; // height / width ratio: 0.98 to 1.14 (very round river stones)
+    this.sizeMultiplier = Math.random() * 0.08 + 0.96; // size multiplier: 0.96 to 1.04 (highly uniform size for clean fit)
     
-    // Position jitter: small enough to prevent overlapping, but large enough to look organic
-    this.jitterX = (Math.random() - 0.5) * colWidth * 0.16;
-    this.jitterY = (Math.random() - 0.5) * rowHeight * 0.16;
+    // Position jitter: tiny to keep gaps uniform and prevent massive gaps / clumping
+    this.jitterX = (Math.random() - 0.5) * colWidth * 0.08;
+    this.jitterY = (Math.random() - 0.5) * rowHeight * 0.08;
     
     this.x = x + this.jitterX;
     this.y = y + this.jitterY;
     
-    this.baseW = colWidth * 0.92; // Slightly smaller than cell width to leave a gap
+    this.baseW = colWidth * 1.08; // Slightly larger than grid spacing so they nest tightly
     this.w = 0;
     this.h = 0;
     
@@ -120,7 +120,7 @@ class Pebble {
         depth = 0.7 - (normY - 0.82) * 2;
       }
 
-      this.targetScale = 0.96; // Do not overlap neighbors to leave a small gap
+      this.targetScale = 1.01; // Nest tightly together with hairline outlines
       this.color = PALETTES[currentPalette](depth, normY);
       
       // Floating/organic wave animation
