@@ -10,25 +10,44 @@
 // Global Color Palettes mapping depth (0 = near/large, 1 = far/small)
 const PALETTES = {
   rainbow: (depth, pctY = 0) => {
-    // vertical gradient mixed with depth-based hue shift
-    const hue = Math.floor((depth * 240 + pctY * 120) % 360);
-    return `hsla(${hue}, 95%, 55%, 1)`;
+    // Shift the vertical color stops based on distance (depth)
+    // 0 = close (warmer, shifts up), 1 = far (cooler, shifts down)
+    const shiftedY = Math.max(0, Math.min(1.0, pctY - (1.0 - depth) * 0.45));
+    
+    // Smooth interpolation between exact stops matching the physical art:
+    // shiftedY = 1.0 (bottom): Solid cyan/blue (hue 195)
+    // shiftedY = 0.75 (middle-bottom): Teal/cyan (hue 165)
+    // shiftedY = 0.55 (middle): Vibrant Green (hue 115)
+    // shiftedY = 0.40 (middle-top): Gold/Yellow (hue 55)
+    // shiftedY = 0.22 (top-middle): Orange (hue 28)
+    // shiftedY = 0.0 (top): Solid Red (hue 0)
+    let hue = 0;
+    if (shiftedY < 0.22) {
+      hue = (shiftedY / 0.22) * 28;
+    } else if (shiftedY < 0.40) {
+      hue = 28 + ((shiftedY - 0.22) / 0.18) * 27;
+    } else if (shiftedY < 0.55) {
+      hue = 55 + ((shiftedY - 0.40) / 0.15) * 60;
+    } else if (shiftedY < 0.75) {
+      hue = 115 + ((shiftedY - 0.55) / 0.20) * 50;
+    } else {
+      hue = 165 + ((shiftedY - 0.75) / 0.25) * 30;
+    }
+    
+    return `hsla(${Math.floor(hue)}, 95%, 52%, 1)`;
   },
   neon: (depth, pctY = 0) => {
-    // Pink, purple, cyan, blue
-    const hues = [330, 280, 190, 220]; // custom hues
+    const hues = [330, 280, 190, 220]; 
     const idx = Math.floor((depth * 3 + pctY) % hues.length);
     const hue = hues[idx];
     return `hsla(${hue}, 100%, 60%, 1)`;
   },
   sunset: (depth, pctY = 0) => {
-    // Gold, orange, red, magenta
-    const hue = Math.floor(depth * 60 + 330 + pctY * 30) % 360; // 330 (magenta) to 30 (orange/yellow)
+    const hue = Math.floor(depth * 60 + 330 + pctY * 30) % 360; 
     return `hsla(${hue}, 100%, 55%, 1)`;
   },
   ocean: (depth, pctY = 0) => {
-    // Emerald, turquoise, cyan, blue
-    const hue = Math.floor(depth * 100 + 150 + pctY * 50); // 150 (green) to 250 (blue)
+    const hue = Math.floor(depth * 100 + 150 + pctY * 50); 
     return `hsla(${hue}, 90%, 50%, 1)`;
   }
 };
@@ -36,15 +55,26 @@ const PALETTES = {
 // 1. Pebble Grid Particle
 class Pebble {
   constructor(x, y, colWidth, rowHeight) {
-    this.x = x;
-    this.y = y;
-    this.baseW = colWidth * 0.85;
-    this.baseH = rowHeight * 1.4; // Oblong / capsule shape
+    // Unique shape geometry for organic physical stone look
+    this.aspectRatio = Math.random() * 0.55 + 1.25; // height / width ratio: 1.25 to 1.8 (some long, some round)
+    this.sizeMultiplier = Math.random() * 0.35 + 0.85; // size multiplier: 0.85 to 1.2
     
+    // Position jitter to break artificial grids
+    this.jitterX = (Math.random() - 0.5) * colWidth * 0.35;
+    this.jitterY = (Math.random() - 0.5) * rowHeight * 0.35;
+    
+    this.x = x + this.jitterX;
+    this.y = y + this.jitterY;
+    
+    this.baseW = colWidth * 0.95;
     this.w = 0;
     this.h = 0;
-    this.rotation = (Math.random() - 0.5) * 0.15; // slight tilt
+    
+    // Initial random angle tilts for natural stone packing
+    this.rotationJitter = (Math.random() - 0.5) * 0.95; // random tilt offset
+    this.rotation = this.rotationJitter;
     this.targetRotation = this.rotation;
+    
     this.scale = 0;
     this.targetScale = 0;
     this.color = 'rgba(0,0,0,0)';
@@ -63,7 +93,6 @@ class Pebble {
     const isSilhouette = segEngine.isInsideSilhouette(normX, normY);
     
     if (isSilhouette || isGround) {
-      // Determine depth
       let depth = 0.5; // Default for ground
       if (isSilhouette) {
         const blob = segEngine.getBlobAt(normX, normY);
@@ -75,22 +104,25 @@ class Pebble {
         depth = 0.7 - (normY - 0.82) * 2;
       }
 
-      this.targetScale = 1.0;
+      this.targetScale = 1.05; // Slightly overlap for tight packing
       this.color = PALETTES[currentPalette](depth, normY);
       
       // Floating/organic wave animation
-      this.offsetX = Math.sin(time * 0.003 + this.floatSeed) * 2.5;
-      this.offsetY = Math.cos(time * 0.002 + this.floatSeed) * 2.5;
+      this.offsetX = Math.sin(time * 0.0022 + this.floatSeed) * 2.2;
+      this.offsetY = Math.cos(time * 0.0016 + this.floatSeed) * 2.2;
       
-      // If silhouette is active, tilt slightly towards centroid
-      if (isSilhouette) {
+      if (isGround) {
+        // Flat/horizontal alignment for floor pebbles
+        this.targetRotation = Math.PI / 2 + this.rotationJitter * 0.3;
+      } else if (isSilhouette) {
+        // Tilt dynamic along body contour
         const blob = segEngine.getBlobAt(normX, normY);
         if (blob) {
           const normCenterX = blob.centerX / segEngine.maskWidth;
-          this.targetRotation = (normX - normCenterX) * 0.5;
+          this.targetRotation = (normX - normCenterX) * 0.65 + this.rotationJitter * 0.45;
+        } else {
+          this.targetRotation = this.rotationJitter;
         }
-      } else {
-        this.targetRotation = (Math.sin(time * 0.001 + this.floatSeed) - 0.5) * 0.1;
       }
     } else {
       this.targetScale = 0.0;
@@ -98,11 +130,13 @@ class Pebble {
       this.offsetY = 0;
     }
 
-    // Smooth scaling
+    // Smooth scaling and rotation
     this.scale += (this.targetScale - this.scale) * 0.12;
-    this.rotation += (this.targetRotation - this.rotation) * 0.1;
-    this.w = this.baseW * this.scale;
-    this.h = this.baseH * this.scale;
+    this.rotation += (this.targetRotation - this.rotation) * 0.08;
+    
+    // Scale widths and heights according to physical constants
+    this.w = this.baseW * this.sizeMultiplier * this.scale;
+    this.h = this.baseW * this.sizeMultiplier * this.aspectRatio * this.scale;
 
     // Handle sound shake
     this.shake = globalShake * (Math.random() - 0.5) * 8;
@@ -115,14 +149,19 @@ class Pebble {
     ctx.translate(this.x + this.offsetX + this.shake, this.y + this.offsetY + this.shake);
     ctx.rotate(this.rotation);
 
-    // Draw capsule/ellipse
+    // Draw solid pebble base
     ctx.fillStyle = this.color;
     ctx.beginPath();
     ctx.ellipse(0, 0, this.w / 2, this.h / 2, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // High premium styling: soft reflection glow inside
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    // Draw physical thin dark border to separate geometries
+    ctx.strokeStyle = 'rgba(5, 5, 8, 0.48)';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // High premium styling: soft organic reflection glow inside
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
     ctx.beginPath();
     ctx.ellipse(-this.w/6, -this.h/6, this.w/4, this.h/6, Math.PI/4, 0, Math.PI * 2);
     ctx.fill();
