@@ -56,22 +56,22 @@ const PALETTES = {
 class Pebble {
   constructor(x, y, colWidth, rowHeight) {
     // Unique shape geometry for organic physical stone look - rounder river stones
-    this.aspectRatio = Math.random() * 0.16 + 0.98; // height / width ratio: 0.98 to 1.14 (very round river stones)
+    this.aspectRatio = Math.random() * 0.16 + 0.94; // height / width ratio: 0.94 to 1.10 (very round river stones)
     this.sizeMultiplier = Math.random() * 0.08 + 0.96; // size multiplier: 0.96 to 1.04 (highly uniform size for clean fit)
     
     // Position jitter: tiny to keep gaps uniform and prevent massive gaps / clumping
-    this.jitterX = (Math.random() - 0.5) * colWidth * 0.08;
-    this.jitterY = (Math.random() - 0.5) * rowHeight * 0.08;
+    this.jitterX = (Math.random() - 0.5) * colWidth * 0.07;
+    this.jitterY = (Math.random() - 0.5) * rowHeight * 0.07;
     
     this.x = x + this.jitterX;
     this.y = y + this.jitterY;
     
-    this.baseW = colWidth * 1.08; // Slightly larger than grid spacing so they nest tightly
+    this.baseW = colWidth * 1.12; // Slightly larger than grid spacing so they nest tightly in all directions
     this.w = 0;
     this.h = 0;
     
     // Initial random angle tilts for natural stone packing
-    this.rotationJitter = (Math.random() - 0.5) * 0.25; // small tilt offset since they are already hex-aligned
+    this.rotationJitter = (Math.random() - 0.5) * 0.22; // small tilt offset since they are already hex-aligned
     this.rotation = this.rotationJitter;
     this.targetRotation = this.rotation;
     
@@ -85,22 +85,68 @@ class Pebble {
     this.floatSeed = Math.random() * 100;
     this.shake = 0;
 
-    // Precalculate organic asymmetric hex-blob shape vertices (points towards neighbor cells)
-    const numPoints = 6;
+    // Precalculate organic asymmetric shape based on a random type:
+    // 0 = Oval/Egg, 1 = Rounded Rect/Boxy, 2 = Rounded Triangle, 3 = Diamond/Pentagon
+    const shapeType = Math.floor(Math.random() * 4); 
     this.points = [];
     const baseR = this.baseW * this.sizeMultiplier / 2;
-    
-    for (let i = 0; i < numPoints; i++) {
-      // Hexagonal directions: 0, 60, 120, 180, 240, 300 degrees
-      const angle = (i / numPoints) * Math.PI * 2 + (Math.random() - 0.5) * 0.08;
-      const radiusX = baseR;
-      const radiusY = baseR * this.aspectRatio;
-      
-      // Radius variance (0.92 to 1.06) generates subtle organic facets
-      const r = (Math.random() * 0.14 + 0.92);
-      const px = Math.cos(angle) * radiusX * r;
-      const py = Math.sin(angle) * radiusY * r;
-      this.points.push({ x: px, y: py });
+    const aspectY = this.aspectRatio;
+
+    if (shapeType === 0) {
+      // Oval/Egg shape: 6 points with smooth transition
+      const numPoints = 6;
+      for (let i = 0; i < numPoints; i++) {
+        const angle = (i / numPoints) * Math.PI * 2 + (Math.random() - 0.5) * 0.08;
+        // Egg shape: wider at bottom (py > 0) than top (py < 0)
+        const eggFactor = Math.sin(angle) > 0 ? 1.04 : 0.88;
+        const r = (Math.random() * 0.08 + 0.94) * eggFactor;
+        const px = Math.cos(angle) * baseR * r;
+        const py = Math.sin(angle) * baseR * aspectY * r;
+        this.points.push({ x: px, py: py });
+      }
+    } 
+    else if (shapeType === 1) {
+      // Rounded Rectangle / Boxy: 8 points grouped near corners
+      const cornerAngles = [
+        35, 55,    // Top Right
+        125, 145,  // Top Left
+        215, 235,  // Bottom Left
+        305, 325   // Bottom Right
+      ];
+      for (const baseAngle of cornerAngles) {
+        const angle = (baseAngle / 180) * Math.PI;
+        // Pull corners out slightly to make it boxy
+        const r = (Math.random() * 0.06 + 0.98) * 1.05;
+        const px = Math.cos(angle) * baseR * r;
+        const py = Math.sin(angle) * baseR * aspectY * r;
+        this.points.push({ x: px, y: py });
+      }
+    } 
+    else if (shapeType === 2) {
+      // Rounded Triangle: 6 points grouped near 3 corners (90, 210, 330 degrees)
+      const triAngles = [
+        80, 100,   // Top
+        200, 220,  // Bottom Left
+        320, 340   // Bottom Right
+      ];
+      for (const baseAngle of triAngles) {
+        const angle = (baseAngle / 180) * Math.PI;
+        const r = (Math.random() * 0.06 + 0.96) * 1.06;
+        const px = Math.cos(angle) * baseR * r;
+        const py = Math.sin(angle) * baseR * aspectY * r;
+        this.points.push({ x: px, y: py });
+      }
+    } 
+    else {
+      // Rounded Diamond / Pentagon: 5 points
+      const pentAngles = [0, 72, 144, 216, 288];
+      for (const baseAngle of pentAngles) {
+        const angle = (baseAngle / 180) * Math.PI + (Math.random() - 0.5) * 0.08;
+        const r = (Math.random() * 0.12 + 0.92);
+        const px = Math.cos(angle) * baseR * r;
+        const py = Math.sin(angle) * baseR * aspectY * r;
+        this.points.push({ x: px, y: py });
+      }
     }
   }
 
@@ -120,7 +166,7 @@ class Pebble {
         depth = 0.7 - (normY - 0.82) * 2;
       }
 
-      this.targetScale = 1.01; // Nest tightly together with hairline outlines
+      this.targetScale = 1.02; // Tight puzzle packing scale
       this.color = PALETTES[currentPalette](depth, normY);
       
       // Floating/organic wave animation
@@ -579,7 +625,8 @@ class PhysicsEngine {
     // 1. Setup Pebble Grid
     this.pebbles = [];
     const colWidth = this.width / this.cols;
-    const rowHeight = this.height / this.rows;
+    const rowHeight = colWidth * 0.866; // Perfect hexagonal vertical step to eliminate rows/stripes
+    this.rows = Math.ceil(this.height / rowHeight) + 1;
 
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
